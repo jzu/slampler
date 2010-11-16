@@ -327,7 +327,7 @@ void *joystick ()
 /**************************************************************************** 
  * write_to_file()
  *
- * Write a string to a file 
+ * Write a string to a file, used by set_led()
  * Fails silently (in case of insufficient rights)
  * *f  Filename
  * *s  String to write
