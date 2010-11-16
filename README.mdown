@@ -48,7 +48,7 @@ which will ensure that `init(8)` restarts the program when it is stopped.
 CAVEAT
 ------
 
-Hence, Debian is perfect for programming/compiling/debugging, but 
+Debian is perfect for programming/compiling/debugging, but 
 another distro might be more adequate for everyday use.
 See OpenEmbedded (http://wiki.openembedded.net/) and others.
 
