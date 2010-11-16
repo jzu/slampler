@@ -1,0 +1,56 @@
+Slug Sample Player
+==================
+
+Version 1.0
+
+Foot-friendly sample player
+
+Copyright (C) Jean Zundel <jzu@free.fr> 2010 
+
+slampler is a sample player designed for the Linksys NSLU2 running GNU/Linux,
+but it works on any ALSA-based architecture. 
+It is licensed under the GNU GPL v3.
+
+
+COMPILATION
+-----------
+
+Just type `make` and you're done. You'll need libasound2 and libpthread
+libraries (+devel), and gcc.
+
+
+TESTING
+-------
+
+Running it as root allows to use the Slug's LEDs.
+
+This program needs an USB joystick - or something similar - to operate. It
+currently manages up to eight switches, but there's room for
+expansion. You will need to tinker with `#include`s to map the physical
+controls with the soft switches.
+
+The `-d` option ouputs debug messages (ALSA errors and joystick events).
+
+
+RUNNING
+-------
+
+Once you're all set, you want to edit `/etc/inittab` to insert this line:
+
+`sl:23:respawn:/[PATH_TO]/slampler`
+
+(obviously replacing `[PATH_TO]` with its actual path)
+which will ensure that `init(8)` restarts the program when it is stopped.
+
+`telinit q` will re-read the inittab file.
+
+
+CAVEAT
+------
+
+Hence, Debian is perfect for programming/compiling/debugging, but 
+another distro might be more adequate for everyday use.
+See OpenEmbedded (http://wiki.openembedded.net/) and others.
+
+
+<!-- Convert to HTML using markdown -->
