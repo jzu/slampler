@@ -47,17 +47,31 @@
 #define DEBUG if (debug) printf
 #define ERROR if (debug) fprintf
 
-// Switches
+// Switches 6B745  547B6
 
+#define SW_SMPL0 9
+#define SW_SMPL1 7
+#define SW_SMPL2 4
+#define SW_SMPL3 5
+#define SW_SMPL4 8
+#define SW_BANK  6
+#define SW_SMPL5 0
+#define SW_SMPL6 2
+#define SW_SMPL7 3
+#define SW_SMPL8 1
+
+/*
 #define SW_SMPL0 0
 #define SW_SMPL1 1
 #define SW_SMPL2 2
-#define SW_SMPL3 4
-#define SW_SMPL4 5
-#define SW_SMPL5 6
-#define SW_SMPL6 7
-#define SW_SMPL7 8
-#define SW_BANK  3
+#define SW_SMPL3 3
+#define SW_SMPL4 4
+#define SW_SMPL5 5
+#define SW_SMPL6 6
+#define SW_SMPL7 7
+#define SW_SMPL8 8
+#define SW_BANK  9
+*/
 
 // LEDs
 
@@ -110,7 +124,7 @@ int main (int argc, char **argv) {
   int rc;                            // Result for ALSA operations
   unsigned int rate = 44100;         // Sample rate
 
-  snd_pcm_hw_params_t *params_play;
+//  snd_pcm_hw_params_t *params_play;
 
 
   if ((argc > 1) && (!strcmp(argv[1], "-d")))
@@ -140,7 +154,7 @@ int main (int argc, char **argv) {
 
   /* PCM playback setup - stereo : some soundcards don't do mono */
 
-  rc = snd_pcm_open (&handle_play, "plughw:0", SND_PCM_STREAM_PLAYBACK, 0);
+  rc = snd_pcm_open (&handle_play, "plughw:1", SND_PCM_STREAM_PLAYBACK, 0);
   if (rc < 0) {
     ERROR (stderr,
            "play - unable to open pcm device: %s\n", snd_strerror (rc));
@@ -152,15 +166,11 @@ int main (int argc, char **argv) {
                                 2,                               // Stereo
                                 rate,
                                 1,                               // Resample
-                                50000)) < 0) {                   // 0.05 sec 
+                                80000)) < 0) {                   // 0.08 sec 
     ERROR (stderr,
            "Playback open error: %s\n", snd_strerror (rc));
     exit (EXIT_FAILURE);
   }
-
-  snd_pcm_hw_params_get_period_size (params_play, 
-                                     &frames,        // 44 for C-sound dongle
-                                     &rc);
 
   /* Processing loop */
 
@@ -236,9 +246,13 @@ int main (int argc, char **argv) {
 void *joystick ()
 {
   int jfd;
+  int s;
+  int i;
+  short bringback;      // Dummy short to bring back samples from swap
   struct js_event ev,
                   oldev;
 
+  memset (&oldev, 0, sizeof (struct js_event));
   memset (smpl_flag, 0, sizeof (int) * NSMPLS);
 
   jfd = open ("/dev/input/js0", O_RDONLY);
@@ -247,7 +261,7 @@ void *joystick ()
     if (read (jfd, &ev, sizeof (ev)) > 0) {
       if ((ev.type == JS_EVENT_BUTTON) &&
                (ev.value == 1)) {
-        if (ev.number == SW_SMPL0) {               // Yeuch
+        if      (ev.number == SW_SMPL0) {          // Yeuch
           smpl_flag[0] ^= 1;
           DEBUG ("smpl0=%d\n", smpl_flag[0]);
         }
@@ -279,7 +293,17 @@ void *joystick ()
           smpl_flag[7] ^= 1;
           DEBUG ("smpl7=%d\n", smpl_flag[7]);
         }
+        else if (ev.number == SW_SMPL8) {
+          smpl_flag[8] ^= 1;
+          DEBUG ("smpl8=%d\n", smpl_flag[8]);
+        }
         else if (ev.number == SW_BANK) {
+          for (s = 0; s < NSMPLS; s++) {          // Shut off running samples
+            smpl_ptr [s] = 0;
+          }
+          for (s = 0; s < NSMPLS; s++)            // Bring samples from swap
+            for (i = 0; i < wavehead [bank][s].size / 2; i++)
+              bringback = wave [bank][s][i];
           switch (++bank) {
             case 3:
               bank = 0;
@@ -309,17 +333,18 @@ void *joystick ()
         }
         if ((ev.value == 1) && 
             (oldev.value == 1) && 
-            (((ev.number == SW_SMPL0) && (oldev.number == SW_BANK)) || 
-             ((ev.number == SW_BANK)  && (oldev.number == SW_SMPL0)))) {
+            (((ev.number == SW_SMPL4) && (oldev.number == SW_BANK)) || 
+             ((ev.number == SW_BANK)  && (oldev.number == SW_SMPL4)))) {
           set_led (LED_READY, 0);
           set_led (LED_DISK1, 0);
           set_led (LED_DISK2, 0);
           set_led (LED_STATUS,1);
-          exit (0);               // Bye if both Bank and Sample 1 are pressed
+          exit (0);               // Bye if both Bank and Sample 4 are pressed
         }
       }
     }
-    oldev.value = ev.value; oldev.number = ev.number;
+    oldev.value  = ev.value; 
+    oldev.number = ev.number;
   }
 }
 
@@ -327,7 +352,7 @@ void *joystick ()
 /**************************************************************************** 
  * write_to_file()
  *
- * Write a string to a file, used by set_led()
+ * Write a string to a file 
  * Fails silently (in case of insufficient rights)
  * *f  Filename
  * *s  String to write
