@@ -48,6 +48,7 @@
 #define ERROR if (debug) fprintf
 
 // Switches 6B745  547B6
+// Depends on the soldering of switch wires on the joystick board
 
 #define SW_SMPL0 9
 #define SW_SMPL1 7
@@ -59,19 +60,6 @@
 #define SW_SMPL6 2
 #define SW_SMPL7 3
 #define SW_SMPL8 1
-
-/*
-#define SW_SMPL0 0
-#define SW_SMPL1 1
-#define SW_SMPL2 2
-#define SW_SMPL3 3
-#define SW_SMPL4 4
-#define SW_SMPL5 5
-#define SW_SMPL6 6
-#define SW_SMPL7 7
-#define SW_SMPL8 8
-#define SW_BANK  9
-*/
 
 // LEDs
 
@@ -88,10 +76,15 @@ struct RIFFfmtdata {
   char  data2 [16];
   int   size;
 };
-struct RIFFfmtdata wavehead [NBANKS][NSMPLS];
 
-short *wave [NBANKS][NSMPLS],
-      *smpl_ptr [NSMPLS];
+struct wcb {                         // Wave Control Block
+  char   path[256];                  //  filename
+  int    fd;                         //  file descriptor
+  int    start;                      //  switch activated
+  struct RIFFfmtdata head;           //  WAV header
+};
+
+struct wcb wave [NBANKS][NSMPLS];
 
 int   smpl_flag [NSMPLS];
 
@@ -102,7 +95,8 @@ pthread_t thread;                    // Joystick thread
 snd_pcm_uframes_t frames = 44;       // But will be set later
 snd_pcm_t *handle_play;
 
-short *playbuf;
+short *playbuf,
+      *filebuf;
 
 int   debug = 0;
 
@@ -120,14 +114,17 @@ void  debugsig (int signum);
 int main (int argc, char **argv) {
 
   int s,
+      b,
       i;
-  int rc;                            // Result for ALSA operations
+  int len,                           // Read from file
+      res,                           // Result for file operations
+      rc;                            // Result for ALSA operations
   unsigned int rate = 44100;         // Sample rate
 
 //  snd_pcm_hw_params_t *params_play;
 
 
-  if ((argc > 1) && (!strcmp(argv[1], "-d")))
+  if ((argc > 1) && (!strcmp (argv [1], "-d")))
     debug = 1;
 
   /* LEDs off */
@@ -137,7 +134,7 @@ int main (int argc, char **argv) {
   set_led (LED_READY, 0);
   set_led (LED_STATUS,0);
 
-  memset (smpl_ptr, 0, sizeof (short *) * NSMPLS);
+  /* Read sample names and headers */
 
   for (i = 0; i < NBANKS; i++)
     load_waves (i);
@@ -148,13 +145,16 @@ int main (int argc, char **argv) {
 
   signal (SIGINT, debugsig);
 
-  // ALSA init
+  // File buffer allocation
 
+  filebuf = (short *) malloc (frames * 4);
   playbuf = (short *) malloc (frames * 4);
+
+  // ALSA init
 
   /* PCM playback setup - stereo : some soundcards don't do mono */
 
-  rc = snd_pcm_open (&handle_play, "plughw:1", SND_PCM_STREAM_PLAYBACK, 0);
+  rc = snd_pcm_open (&handle_play, "plughw:0", SND_PCM_STREAM_PLAYBACK, 0);
   if (rc < 0) {
     ERROR (stderr,
            "play - unable to open pcm device: %s\n", snd_strerror (rc));
@@ -181,47 +181,65 @@ int main (int argc, char **argv) {
     for (s = 0; s < NSMPLS; s++)
       if (smpl_flag [s]) {
         smpl_flag [s] = 0;
-        smpl_ptr [s] = wave [bank][s];
-        DEBUG ("start\n");
+        if (wave [bank][s].fd > 0) {
+          close (wave [bank][s].fd);    // Only one instance at the same time
+          wave [bank][s].fd = 0;        // Closed, will be restarted
+        }
+        if (wave [bank][s].head.size)
+          wave [bank][s].fd = open (wave [bank][s].path, O_RDONLY);
+        DEBUG ("start %d-%d (%s) = %d\n", 
+               bank, s, wave[bank][s].path, wave[bank][s].fd);
       }
 
-    /* Mix samples in playback buffer */
+    /* Read and mix samples in playback buffer */
 
-    memset (playbuf, 0, frames*4);                     // Stereo, 16-bit
+    memset (playbuf, 0, frames*4);                       // Stereo, 16-bit
                                               
-    for (s = 0; s < NSMPLS; s++)
-      if (smpl_ptr [s]) {
-        for (i = 0; i < frames*2; i += 2) {
-          if ((playbuf [i] > 0) &&
-              (smpl_ptr [s][i] > 0) &&
-              (playbuf [i] + smpl_ptr [s][i] < 0))
-            playbuf [i] = playbuf [i+1] = SHRT_MAX;    // Prevents rollovers
-          else 
-          if ((playbuf [i] < 0) &&
-              (smpl_ptr [s][i] < 0) &&
-              (playbuf [i] + smpl_ptr [s][i] > 0))
-            playbuf [i] = playbuf [i+1] = SHRT_MIN;
-          else {
-            playbuf [i]   += smpl_ptr [s][i]/2;        // Mono to stereo
-            playbuf [i+1] += smpl_ptr [s][i]/2;
+    for (b = 0; b < NBANKS; b++)
+      for (s = 0; s < NSMPLS; s++)
+        if (wave [b][s].fd) {
+          len = frames * 2 * wave [b][s].head.numchannels;
+          res = read (wave [b][s].fd, 
+                      filebuf, 
+                      len);
+          if (len == frames * 2)                         // Mono to stereo
+            for (i = len/2-1; i >= 0; i--) {
+              filebuf [i*2] = filebuf [i*2+1] = filebuf [i];
+            }
+          for (i = 0; i < frames*2; i += 2) {
+            if ((playbuf [i] > 0) &&
+                (filebuf [i] > 0) &&
+                (playbuf [i] + filebuf [i]/2 < 0))
+              playbuf [i] = playbuf [i+1] = SHRT_MAX;    // Prevents rollovers
+            else 
+            if ((playbuf [i] < 0) &&
+                (filebuf [i] < 0) &&
+                (playbuf [i] + filebuf [i]/2 > 0))
+              playbuf [i] = playbuf [i+1] = SHRT_MIN;
+            else {
+              playbuf [i]   += filebuf [i]/2;            // Mix (-3 dB)
+              playbuf [i+1] += filebuf [i+1]/2;
+            }
+          }
+          if (res < len) {
+            close (wave [b][s].fd);                      // Hoc finiunt samples
+            wave [b][s].fd = 0;
+            DEBUG ("stop %d-%d\n", b, s);
           }
         }
-        smpl_ptr [s] += (frames * 2);
-        if (smpl_ptr [s] >= wave [bank][s] + wavehead [bank][s].size / 2) {
-          smpl_ptr [s] = 0;                            // Hoc finiunt samples
-          DEBUG ("stop\n");
-        }
-      }
 
     /* Write playback buffer content to device */
 
-    rc = snd_pcm_writei (handle_play, playbuf, frames);
-
+    rc = snd_pcm_writei (handle_play, 
+                         playbuf, 
+                         frames);
     if (rc == -EPIPE) {
       ERROR (stderr, 
              "writei - underrun occurred\n");
       snd_pcm_prepare (handle_play);
-      snd_pcm_writei (handle_play, playbuf, frames);
+      snd_pcm_writei (handle_play, 
+                      playbuf, 
+                      frames);
     } else if (rc < 0) {
       ERROR (stderr,
              "error from write: %s\n", snd_strerror (rc));
@@ -240,15 +258,12 @@ int main (int argc, char **argv) {
  *
  * Separate thread
  * Access to four switches, switches NSLU2 LEDs on/off
- * Could use another joystick for 4 more switches (open ("/dev/input/js1...)
+ * Could use another joystick for more switches (open ("/dev/input/js1...)
  ****************************************************************************/
 
 void *joystick ()
 {
   int jfd;
-  int s;
-  int i;
-  short bringback;      // Dummy short to bring back samples from swap
   struct js_event ev,
                   oldev;
 
@@ -298,12 +313,6 @@ void *joystick ()
           DEBUG ("smpl8=%d\n", smpl_flag[8]);
         }
         else if (ev.number == SW_BANK) {
-          for (s = 0; s < NSMPLS; s++) {          // Shut off running samples
-            smpl_ptr [s] = 0;
-          }
-          for (s = 0; s < NSMPLS; s++)            // Bring samples from swap
-            for (i = 0; i < wavehead [bank][s].size / 2; i++)
-              bringback = wave [bank][s][i];
           switch (++bank) {
             case 3:
               bank = 0;
@@ -362,9 +371,10 @@ void write_to_file (const char *f, const char *s) {
 
   int fout;
 
-  fout = open (f, O_WRONLY);
-  write (fout, s, strlen (s));
-  close (fout);
+  if ((fout = open (f, O_WRONLY)) > 0) {
+    write (fout, s, strlen (s));
+    close (fout);
+  }
 }
 
 /****************************************************************************
@@ -399,26 +409,25 @@ void load_waves (int rep) {
 
   DIR *dirp;
   struct dirent *dp;
-  int f, 
-      i;
+  int f;
   int wfile;
-  char repname [256], 
-       wname [256];
+  char repname [256];
 
   sprintf (repname, "%s/%d", DATADIR, rep);
   if ((dirp = opendir (repname)) != NULL) {
     f = 0;
-    while (((dp = readdir (dirp)) != NULL) && (f < NSMPLS)) {
+    while (((dp = readdir (dirp)) != NULL) && 
+           (f < NSMPLS)) {
       if (dp->d_name[0] != '.') {
-        sprintf (wname, "%s/%d/%s", DATADIR, rep, dp->d_name);
-        wfile = open (wname, O_RDONLY);
-        read (wfile, &wavehead [rep][f], sizeof (struct RIFFfmtdata));
-        wave [rep][f] = malloc (wavehead [rep][f].size);
-        read (wfile, wave [rep][f], wavehead [rep][f].size);
-        if (wavehead [rep][f].numchannels == 2)                // Back to mono
-          for (i = 0; i < wavehead [rep][f].size / 2 ; i += 2)
-            wave [rep][f][i] = wave [rep][f][i] / 2 + wave [rep][f][i+1] / 2;
-        DEBUG ("%10d  %s\n", wavehead [rep][f].size, wname);
+        sprintf (wave [rep][f].path, "%s/%d/%s", 
+                 DATADIR, 
+                 rep, 
+                 dp->d_name);
+        wfile = open (wave [rep][f].path, O_RDONLY);
+        read (wfile, 
+              &wave [rep][f].head, 
+              sizeof (struct RIFFfmtdata));
+        DEBUG ("%10d  %s\n", wave [rep][f].head.size, wave [rep][f].path);
         close (wfile);
         f++;
       }
@@ -428,7 +437,7 @@ void load_waves (int rep) {
   }
   else {
     ERROR (stderr,
-           "Caramba, totale felure sur %s\n", repname);
+           "Could not read %s\n", repname);
   }
 }
 
