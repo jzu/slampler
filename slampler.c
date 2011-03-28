@@ -37,6 +37,7 @@
 #include <math.h>
 #include <signal.h>
 #include <dirent.h>
+#include <termios.h>
 
 #define DATADIR "/data"
 #define NBANKS 3
@@ -90,7 +91,6 @@ int   smpl_flag [NSMPLS];
 
 int bank = 0;
 
-pthread_t thread;                    // Joystick thread
 
 snd_pcm_uframes_t frames = 44;       // But will be set later
 snd_pcm_t *handle_play;
@@ -100,8 +100,14 @@ short *playbuf,
 
 int   debug = 0;
 
+pthread_t jthread;                   // Joystick thread
+pthread_t kthread;                   // Keyboard thread
+
+struct termios raw_mode;
+struct termios cooked_mode;
 
 void  *joystick ();
+void  *keyboard ();
 void  set_led (char *led, int i);
 void  load_waves (int rep);
 void  debugsig (int signum);
@@ -139,9 +145,10 @@ int main (int argc, char **argv) {
   for (i = 0; i < NBANKS; i++)
     load_waves (i);
 
-  /* Joystick thread */
+  /* Thread */
 
-  pthread_create (&thread, NULL, joystick, NULL);
+  pthread_create (&jthread, NULL, joystick, NULL);
+  pthread_create (&kthread, NULL, keyboard, NULL);
 
   signal (SIGINT, debugsig);
 
@@ -254,6 +261,90 @@ int main (int argc, char **argv) {
 
 
 /**************************************************************************** 
+ * write_to_file()
+ *
+ * Write a string to a file 
+ * Fails silently (in case of insufficient rights)
+ * *f  Filename
+ * *s  String to write
+ ****************************************************************************/
+
+void write_to_file (const char *f, const char *s) {
+
+  int fout;
+
+  if ((fout = open (f, O_WRONLY)) > 0) {
+    write (fout, s, strlen (s));
+    close (fout);
+  }
+}
+
+/****************************************************************************
+ * set_led()
+ *
+ * Switch LEDs on/off 
+ * Needs to be run as root to work, else nothing happens
+ * *led  Dirname (/sys/classes/leds/foo/)
+ * i     Value   (0||!0)
+ ****************************************************************************/
+
+void set_led (char *led, int i) {
+
+  char led_bright [256];
+
+  strncpy (led_bright, led, 255);
+  strncat (led_bright, "/brightness", 255);
+  write_to_file (led_bright, i ? "255" : "0");
+}   
+
+
+/****************************************************************************
+ * load_waves()
+ *
+ * Loads .WAVs from a (numerically named) directory for a sample bank
+ * All files at 44100 Hz, 2 bytes/sample, mono or stereo, normalized at -3dB
+ *
+ * rep  Number for directory name (should be 0,1,2...)
+ ****************************************************************************/
+
+void load_waves (int rep) {
+
+  DIR *dirp;
+  struct dirent *dp;
+  int f;
+  int wfile;
+  char repname [256];
+
+  sprintf (repname, "%s/%d", DATADIR, rep);
+  if ((dirp = opendir (repname)) != NULL) {
+    f = 0;
+    while (((dp = readdir (dirp)) != NULL) && 
+           (f < NSMPLS)) {
+      if (dp->d_name[0] != '.') {
+        sprintf (wave [rep][f].path, "%s/%d/%s", 
+                 DATADIR, 
+                 rep, 
+                 dp->d_name);
+        wfile = open (wave [rep][f].path, O_RDONLY);
+        read (wfile, 
+              &wave [rep][f].head, 
+              sizeof (struct RIFFfmtdata));
+        DEBUG ("%10d  %s\n", wave [rep][f].head.size, wave [rep][f].path);
+        close (wfile);
+        f++;
+      }
+    }
+    closedir (dirp);
+    return;
+  }
+  else {
+    ERROR (stderr,
+           "Could not read %s\n", repname);
+  }
+}
+
+
+/**************************************************************************** 
  * joystick()
  *
  * Separate thread
@@ -338,12 +429,13 @@ void *joystick ()
           DEBUG ("bank %d\n", bank);
         }
         else {
-          DEBUG ("ev.number=%d\n", ev.number);
+          DEBUG ("c=%d\n", ev.number);
         }
         if ((ev.value == 1) && 
             (oldev.value == 1) && 
             (((ev.number == SW_SMPL4) && (oldev.number == SW_BANK)) || 
              ((ev.number == SW_BANK)  && (oldev.number == SW_SMPL4)))) {
+          tcsetattr (0, TCSANOW, &cooked_mode);
           set_led (LED_READY, 0);
           set_led (LED_DISK1, 0);
           set_led (LED_DISK2, 0);
@@ -359,88 +451,101 @@ void *joystick ()
 
 
 /**************************************************************************** 
- * write_to_file()
+ * keyboard()
  *
- * Write a string to a file 
- * Fails silently (in case of insufficient rights)
- * *f  Filename
- * *s  String to write
+ * Separate thread
+ * No joystick at hand? Just use a keyboard.
  ****************************************************************************/
 
-void write_to_file (const char *f, const char *s) {
+void *keyboard ()
+{
 
-  int fout;
+  char c,
+       oldc;
 
-  if ((fout = open (f, O_WRONLY)) > 0) {
-    write (fout, s, strlen (s));
-    close (fout);
-  }
-}
+  /* We like it raw */
 
-/****************************************************************************
- * set_led()
- *
- * Switch LEDs on/off 
- * Needs to be run as root to work, else nothing happens
- * *led  Dirname (/sys/classes/leds/foo/)
- * i     Value   (0||!0)
- ****************************************************************************/
+  tcgetattr (0, &cooked_mode);
+  memcpy (&raw_mode, &cooked_mode, sizeof (struct termios));
 
-void set_led (char *led, int i) {
+  raw_mode.c_lflag &= ~(ICANON | ECHO);
+  raw_mode.c_cc [VTIME] = 0;
+  raw_mode.c_cc [VMIN] = 1;
+  tcsetattr (0, TCSANOW, &raw_mode);
 
-  char led_bright [256];
+  c = '\0';
+  memset (smpl_flag, 0, sizeof (int) * NSMPLS);
 
-  strncpy (led_bright, led, 255);
-  strncat (led_bright, "/brightness", 255);
-  write_to_file (led_bright, i ? "255" : "0");
-}   
-
-
-/****************************************************************************
- * load_waves()
- *
- * Loads .WAVs from a (numerically named) directory for a sample bank
- * All files at 44100 Hz, 2 bytes/sample, mono or stereo, normalized at -3dB
- *
- * rep  Number for directory name (should be 0,1,2...)
- ****************************************************************************/
-
-void load_waves (int rep) {
-
-  DIR *dirp;
-  struct dirent *dp;
-  int f;
-  int wfile;
-  char repname [256];
-
-  sprintf (repname, "%s/%d", DATADIR, rep);
-  if ((dirp = opendir (repname)) != NULL) {
-    f = 0;
-    while (((dp = readdir (dirp)) != NULL) && 
-           (f < NSMPLS)) {
-      if (dp->d_name[0] != '.') {
-        sprintf (wave [rep][f].path, "%s/%d/%s", 
-                 DATADIR, 
-                 rep, 
-                 dp->d_name);
-        wfile = open (wave [rep][f].path, O_RDONLY);
-        read (wfile, 
-              &wave [rep][f].head, 
-              sizeof (struct RIFFfmtdata));
-        DEBUG ("%10d  %s\n", wave [rep][f].head.size, wave [rep][f].path);
-        close (wfile);
-        f++;
+  while (1) {
+    if (read (0, &c, 1) == 1) {
+        if      (c == 'a') {          // Yeuch
+          smpl_flag[0] ^= 1;
+          DEBUG ("smpl0=%d\n", smpl_flag[0]);
+        }
+        else if (c == 'z') {
+          smpl_flag[1] ^= 1;
+          DEBUG ("smpl1=%d\n", smpl_flag[1]);
+        }
+        else if (c == 'e') {
+          smpl_flag[2] ^= 1;
+          DEBUG ("smpl2=%d\n", smpl_flag[2]);
+        }
+        else if (c == 'r') {
+          smpl_flag[3] ^= 1;
+          DEBUG ("smpl3=%d\n", smpl_flag[3]);
+        }
+        else if (c == 't') {
+          smpl_flag[4] ^= 1;
+          DEBUG ("smpl4=%d\n", smpl_flag[4]);
+        }
+        else if (c == 'y') {
+          smpl_flag[5] ^= 1;
+          DEBUG ("smpl5=%d\n", smpl_flag[5]);
+        }
+        else if (c == 'u') {
+          smpl_flag[6] ^= 1;
+          DEBUG ("smpl6=%d\n", smpl_flag[6]);
+        }
+        else if (c == 'i') {
+          smpl_flag[7] ^= 1;
+          DEBUG ("smpl7=%d\n", smpl_flag[7]);
+        }
+        else if (c == 'o') {
+          smpl_flag[8] ^= 1;
+          DEBUG ("smpl8=%d\n", smpl_flag[8]);
+        }
+        else if (c == '\n') {
+          switch (++bank) {
+            case 3:
+              bank = 0;
+            case 0:
+              set_led (LED_DISK1, 255);
+              set_led (LED_DISK2,   0);
+              set_led (LED_READY,   0);
+              break;
+            case 1:
+              set_led (LED_DISK1,   0);
+              set_led (LED_DISK2, 255);
+              set_led (LED_READY,   0);
+              break;
+            case 2:
+              set_led (LED_DISK1,   0);
+              set_led (LED_DISK2,   0);
+              set_led (LED_READY, 255);
+              break;
+            default:
+              bank = 0;
+              break;
+          }
+          DEBUG ("bank %d\n", bank);
+        }
+        else {
+          DEBUG ("c=%c\n", c);
+        }
       }
-    }
-    closedir (dirp);
-    return;
-  }
-  else {
-    ERROR (stderr,
-           "Could not read %s\n", repname);
+    oldc = c;
   }
 }
-
 
 
 /****************************************************************************
@@ -451,6 +556,13 @@ void load_waves (int rep) {
  ****************************************************************************/
 
 void debugsig (int signum) {
+
+  tcsetattr (0, TCSANOW, &cooked_mode);
+
+  set_led (LED_READY, 0);
+  set_led (LED_DISK1, 0);
+  set_led (LED_DISK2, 0);
+  set_led (LED_STATUS,1);
 
   exit(0);
 }

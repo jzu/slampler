@@ -24,10 +24,11 @@ TESTING
 
 Running it as root allows to use the Slug's LEDs.
 
-This program needs an USB joystick - or something similar - to operate. It
-currently manages up to eight switches, but there's room for
-expansion. You will need to tinker with `#include`s to map the physical
-controls with the soft switches.
+This program needs either an USB joystick - or something similar - to operate
+in "production mode". For testing purposes, another thread reads STDIN and
+scans characters you can map with samples. It currently manages up to eight
+samples per bank, but there's room for expansion. You will need to tinker with
+`#include`s to map the physical controls with the soft switches.
 
 The `-d` option ouputs debug messages (ALSA errors and joystick events).
 
