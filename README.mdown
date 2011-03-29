@@ -3,7 +3,7 @@ Slug Sample Player
 
 Version 1.0
 
-Foot-friendly sample player
+Foot-friendly, stage-ready sample player
 
 Copyright (C) Jean Zundel <jzu@free.fr> 2010 
 
@@ -11,6 +11,7 @@ slampler is a sample player designed for the Linksys NSLU2 running GNU/Linux,
 but it works on any ALSA-based architecture. 
 It is licensed under the GNU GPL v3.
 
+http://jzu.blog.free.fr/index.php?tag/Slampler
 
 COMPILATION
 -----------

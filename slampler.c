@@ -231,7 +231,7 @@ int main (int argc, char **argv) {
           if (res < len) {
             close (wave [b][s].fd);                      // Hoc finiunt samples
             wave [b][s].fd = 0;
-            DEBUG ("stop %d-%d\n", b, s);
+            DEBUG ("stop  %d-%d\n", b, s);
           }
         }
 
@@ -350,6 +350,7 @@ void load_waves (int rep) {
  * Separate thread
  * Access to four switches, switches NSLU2 LEDs on/off
  * Could use another joystick for more switches (open ("/dev/input/js1...)
+ * Should cycle through an array mapping ev.number -> smpl_flag
  ****************************************************************************/
 
 void *joystick ()
@@ -367,42 +368,24 @@ void *joystick ()
     if (read (jfd, &ev, sizeof (ev)) > 0) {
       if ((ev.type == JS_EVENT_BUTTON) &&
                (ev.value == 1)) {
-        if      (ev.number == SW_SMPL0) {          // Yeuch
+        if      (ev.number == SW_SMPL0)            // Yeuch
           smpl_flag[0] ^= 1;
-          DEBUG ("smpl0=%d\n", smpl_flag[0]);
-        }
-        else if (ev.number == SW_SMPL1) {
+        else if (ev.number == SW_SMPL1)
           smpl_flag[1] ^= 1;
-          DEBUG ("smpl1=%d\n", smpl_flag[1]);
-        }
-        else if (ev.number == SW_SMPL2) {
+        else if (ev.number == SW_SMPL2)
           smpl_flag[2] ^= 1;
-          DEBUG ("smpl2=%d\n", smpl_flag[2]);
-        }
-        else if (ev.number == SW_SMPL3) {
+        else if (ev.number == SW_SMPL3)
           smpl_flag[3] ^= 1;
-          DEBUG ("smpl3=%d\n", smpl_flag[3]);
-        }
-        else if (ev.number == SW_SMPL4) {
+        else if (ev.number == SW_SMPL4)
           smpl_flag[4] ^= 1;
-          DEBUG ("smpl4=%d\n", smpl_flag[4]);
-        }
-        else if (ev.number == SW_SMPL5) {
+        else if (ev.number == SW_SMPL5)
           smpl_flag[5] ^= 1;
-          DEBUG ("smpl5=%d\n", smpl_flag[5]);
-        }
-        else if (ev.number == SW_SMPL6) {
+        else if (ev.number == SW_SMPL6)
           smpl_flag[6] ^= 1;
-          DEBUG ("smpl6=%d\n", smpl_flag[6]);
-        }
-        else if (ev.number == SW_SMPL7) {
+        else if (ev.number == SW_SMPL7)
           smpl_flag[7] ^= 1;
-          DEBUG ("smpl7=%d\n", smpl_flag[7]);
-        }
-        else if (ev.number == SW_SMPL8) {
+        else if (ev.number == SW_SMPL8)
           smpl_flag[8] ^= 1;
-          DEBUG ("smpl8=%d\n", smpl_flag[8]);
-        }
         else if (ev.number == SW_BANK) {
           switch (++bank) {
             case 3:
@@ -429,7 +412,7 @@ void *joystick ()
           DEBUG ("bank %d\n", bank);
         }
         else {
-          DEBUG ("c=%d\n", ev.number);
+          DEBUG ("ev.number=%d\n", ev.number);
         }
         if ((ev.value == 1) && 
             (oldev.value == 1) && 
@@ -455,13 +438,13 @@ void *joystick ()
  *
  * Separate thread
  * No joystick at hand? Just use a keyboard.
+ * Should use an array instead of a switch/case, see above.
  ****************************************************************************/
 
 void *keyboard ()
 {
 
-  char c,
-       oldc;
+  char c;
 
   /* We like it raw */
 
@@ -478,72 +461,53 @@ void *keyboard ()
 
   while (1) {
     if (read (0, &c, 1) == 1) {
-        if      (c == 'a') {          // Yeuch
-          smpl_flag[0] ^= 1;
-          DEBUG ("smpl0=%d\n", smpl_flag[0]);
+      if      (c == 'a')       // 'q' (and 'w' below) might suit you better
+        smpl_flag[0] ^= 1;
+      else if (c == 'z')
+        smpl_flag[1] ^= 1;
+      else if (c == 'e')
+        smpl_flag[2] ^= 1;
+      else if (c == 'r')
+        smpl_flag[3] ^= 1;
+      else if (c == 't')
+        smpl_flag[4] ^= 1;
+      else if (c == 'y')
+        smpl_flag[5] ^= 1;
+      else if (c == 'u')
+        smpl_flag[6] ^= 1;
+      else if (c == 'i')
+        smpl_flag[7] ^= 1;
+      else if (c == 'o')
+        smpl_flag[8] ^= 1;
+      else if (c == '\n') {
+        switch (++bank) {
+          case 3:
+            bank = 0;
+          case 0:
+            set_led (LED_DISK1, 255);
+            set_led (LED_DISK2,   0);
+            set_led (LED_READY,   0);
+            break;
+          case 1:
+            set_led (LED_DISK1,   0);
+            set_led (LED_DISK2, 255);
+            set_led (LED_READY,   0);
+            break;
+          case 2:
+            set_led (LED_DISK1,   0);
+            set_led (LED_DISK2,   0);
+            set_led (LED_READY, 255);
+            break;
+          default:
+            bank = 0;
+            break;
         }
-        else if (c == 'z') {
-          smpl_flag[1] ^= 1;
-          DEBUG ("smpl1=%d\n", smpl_flag[1]);
-        }
-        else if (c == 'e') {
-          smpl_flag[2] ^= 1;
-          DEBUG ("smpl2=%d\n", smpl_flag[2]);
-        }
-        else if (c == 'r') {
-          smpl_flag[3] ^= 1;
-          DEBUG ("smpl3=%d\n", smpl_flag[3]);
-        }
-        else if (c == 't') {
-          smpl_flag[4] ^= 1;
-          DEBUG ("smpl4=%d\n", smpl_flag[4]);
-        }
-        else if (c == 'y') {
-          smpl_flag[5] ^= 1;
-          DEBUG ("smpl5=%d\n", smpl_flag[5]);
-        }
-        else if (c == 'u') {
-          smpl_flag[6] ^= 1;
-          DEBUG ("smpl6=%d\n", smpl_flag[6]);
-        }
-        else if (c == 'i') {
-          smpl_flag[7] ^= 1;
-          DEBUG ("smpl7=%d\n", smpl_flag[7]);
-        }
-        else if (c == 'o') {
-          smpl_flag[8] ^= 1;
-          DEBUG ("smpl8=%d\n", smpl_flag[8]);
-        }
-        else if (c == '\n') {
-          switch (++bank) {
-            case 3:
-              bank = 0;
-            case 0:
-              set_led (LED_DISK1, 255);
-              set_led (LED_DISK2,   0);
-              set_led (LED_READY,   0);
-              break;
-            case 1:
-              set_led (LED_DISK1,   0);
-              set_led (LED_DISK2, 255);
-              set_led (LED_READY,   0);
-              break;
-            case 2:
-              set_led (LED_DISK1,   0);
-              set_led (LED_DISK2,   0);
-              set_led (LED_READY, 255);
-              break;
-            default:
-              bank = 0;
-              break;
-          }
-          DEBUG ("bank %d\n", bank);
-        }
-        else {
-          DEBUG ("c=%c\n", c);
-        }
+        DEBUG ("bank %d\n", bank);
       }
-    oldc = c;
+      else {
+        DEBUG ("c=%c\n", c);
+      }
+    }
   }
 }
 
