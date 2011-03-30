@@ -55,7 +55,7 @@ startup). Here are the relevant lines in my `/etc/fstab` file:
     (...)
     none       /tmp      ramfs   size=512k  0 0
     none       /var/run  ramfs   size=512k  0 0
-    /dev/sdb1  /data     vfat    defaults   0 0
+    /dev/sdb1  /data     vfat    ro         0 0
 
 
 CAVEAT
@@ -65,7 +65,7 @@ Debian is perfect for programming/compiling/debugging, but
 another distro might be more adequate for everyday use.
 See [OpenEmbedded](http://wiki.openembedded.net/) and others.
 
-Almost any USB audio interface will do. The el-cheapo ($3 on eBay)
+Almost any USB audio interface will do. These el cheapo ($3 on eBay)
 C-Sound/3D Sound dongles, however, should be avoided, unless you
 like hiss and rumble. Mine registers in dmesg with a line containing
 `idVendor=0c76, idProduct=1607`. Currently, I use an ART USB Phono
