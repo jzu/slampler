@@ -43,8 +43,6 @@
 #define NBANKS 3
 #define NSMPLS 5
 
-#define INITIAL_LENGTH 0x100000
-
 #define DEBUG if (debug) printf
 #define ERROR if (debug) fprintf
 
