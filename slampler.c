@@ -309,9 +309,17 @@ void load_waves (int rep) {
 
   DIR *dirp;
   struct dirent *dp;
-  int f;
+  int f,
+      g;
   int wfile;
   char repname [256];
+
+  char *name [5];                                 // Sort vars
+  char *s;
+  int  mod;
+
+  memset (name, 0, sizeof (char *) * NSMPLS);
+  s = malloc (256);
 
   sprintf (repname, "%s/%d", DATADIR, rep);
   if ((dirp = opendir (repname)) != NULL) {
@@ -319,20 +327,44 @@ void load_waves (int rep) {
     while (((dp = readdir (dirp)) != NULL) && 
            (f < NSMPLS)) {
       if (dp->d_name[0] != '.') {
-        sprintf (wave [rep][f].path, "%s/%d/%s", 
-                 DATADIR, 
-                 rep, 
-                 dp->d_name);
-        wfile = open (wave [rep][f].path, O_RDONLY);
-        read (wfile, 
-              &wave [rep][f].head, 
-              sizeof (struct RIFFfmtdata));
-        DEBUG ("%10d  %s\n", wave [rep][f].head.size, wave [rep][f].path);
-        close (wfile);
+        name [f] = malloc (256);
+        strcpy (name [f], dp->d_name);
         f++;
       }
     }
+    for (f = 0; f < NSMPLS-1; f++) {             // Bubble sort
+      for (g = 0, mod = 0; 
+           (g < NSMPLS-1) && (name [g+1] != NULL); 
+           g++) {
+        if (strcmp (name [g], name [g+1]) > 0 ) {
+          mod = 1;
+          s = name [g];
+          name [g] = name [g+1];
+          name [g+1] = s;
+        }
+      }
+      if (! mod)
+        f = NSMPLS;                              // Completed, exit
+    }
+    for (f = 0; 
+         (f < NSMPLS) && (name [f] != NULL); 
+         f++) {
+      sprintf (wave [rep][f].path, "%s/%d/%s", 
+               DATADIR, 
+               rep, 
+               name [f]);
+      wfile = open (wave [rep][f].path, O_RDONLY);
+      read (wfile, 
+            &wave [rep][f].head, 
+            sizeof (struct RIFFfmtdata));
+      DEBUG ("%10d  %s\n", wave [rep][f].head.size, wave [rep][f].path);
+      close (wfile);
+    }
     closedir (dirp);
+
+    for (f = 0; (f < NSMPLS) && (name [f] != NULL); f++)
+      free (name [f]);
+
     return;
   }
   else {
