@@ -57,6 +57,10 @@ startup). Here are the relevant lines in my `/etc/fstab` file:
     none       /var/run  ramfs   size=512k  0 0
     /dev/sdb1  /data     vfat    ro         0 0
 
+The memory stick should contain 3 directories named 0, 1, and 2 if `NBANKS` is
+`#define`d to 3. Each may contain up to `NSMPLS` samples (5 by default) which
+will be read in alphabetical order (case-sensitive), allowing a fixed
+sample/switch mapping.
 
 CAVEAT
 ------
