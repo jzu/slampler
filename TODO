@@ -1,3 +1,4 @@
+- Find a way to automagically mount a memory stick (crontab? custom daemon?)
 - Replace these lists of elsifs in input threads by loops
 - Create yet another input thread to use an USB keyboard
 - Test different soundcards: Behringer UFO202 and others
