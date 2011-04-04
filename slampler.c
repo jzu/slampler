@@ -131,9 +131,9 @@ int main (int argc, char **argv) {
   if ((argc > 1) && (!strcmp (argv [1], "-d")))
     debug = 1;
 
-  /* LEDs off */
+  /* LED init */
 
-  set_led (LED_DISK1, 0);
+  set_led (LED_DISK1, 255);
   set_led (LED_DISK2, 0);
   set_led (LED_READY, 0);
   set_led (LED_STATUS,0);
@@ -161,9 +161,10 @@ int main (int argc, char **argv) {
 
   rc = snd_pcm_open (&handle_play, "plughw:0", SND_PCM_STREAM_PLAYBACK, 0);
   if (rc < 0) {
+    tcsetattr (0, TCSANOW, &cooked_mode);
     ERROR (stderr,
            "play - unable to open pcm device: %s\n", snd_strerror (rc));
-    exit (1);
+    exit (EXIT_FAILURE);
   }
   if ((rc = snd_pcm_set_params (handle_play,
                                 SND_PCM_FORMAT_S16_LE,
@@ -172,6 +173,7 @@ int main (int argc, char **argv) {
                                 rate,
                                 1,                               // Resample
                                 80000)) < 0) {                   // 0.08 sec 
+    tcsetattr (0, TCSANOW, &cooked_mode);
     ERROR (stderr,
            "Playback open error: %s\n", snd_strerror (rc));
     exit (EXIT_FAILURE);
