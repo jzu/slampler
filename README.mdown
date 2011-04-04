@@ -1,7 +1,7 @@
 Slampler - Slug Sample Player
 =============================
 
-Version 1.0
+Version 1.0 (more or less)
 
 Foot-friendly, stage-ready sample player
 
@@ -33,6 +33,11 @@ samples per bank, but there's room for expansion. You will need to tinker with
 
 The `-d` option ouputs debug messages, ALSA errors and joystick events.
 
+The `/data` directory should contain NBANKS (3 by default) directories 
+containing NSMPLS (5 by default) samples which will be read in
+alphabetical order (case-sensitive), allowing a fixed sample/switch
+mapping.
+
 
 RUNNING
 -------
@@ -47,20 +52,13 @@ which will ensure that `init(8)` restarts the program when it is stopped.
 `telinit q` will re-read the inittab file.
 
 Mounting the / filesystem read-only prevents data corruption, but you have to
-create ramdisks for `/tmp` and `/var/run` directories. You might also want to
-plug a memory stick containing the samples (read-only too, will be mounted at
-startup). Here are the relevant lines in my `/etc/fstab` file:
+create ramdisks for `/tmp` and `/var/run` directories. 
 
     /dev/sda2       /    ext3    ro         0 0
     (...)
     none       /tmp      ramfs   size=512k  0 0
     none       /var/run  ramfs   size=512k  0 0
-    /dev/sdb1  /data     vfat    ro         0 0
 
-The memory stick should contain 3 directories named 0, 1, and 2 if `NBANKS` is
-`#define`d to 3. Each may contain up to `NSMPLS` samples (5 by default) which
-will be read in alphabetical order (case-sensitive), allowing a fixed
-sample/switch mapping.
 
 CAVEAT
 ------
@@ -75,5 +73,15 @@ like hiss and rumble. Mine registers in dmesg with a line containing
 `idVendor=0c76, idProduct=1607`. Currently, I use an ART USB Phono
 Plus with good results - I have yet to give the Behringer UFO202 
 ($27) a try.
+
+Using a memory stick containing the samples is not as trivial as it seems. If
+you plug it directly in one of the Slug's USB internal ports, it will be
+detected *before* the boot USB key and the system will hang. Autofs doesn't
+help us very much here since the directory is already used by the running
+process, which has been started by inittab - even when stopping/restarting the
+process. A possible workaround would involve a cron job (thus reanimating the
+cron daemon), launched every minute, which would have to detect a `/dev/sdb`
+device, compare with `/proc/mounts`, and mount/umount `/dev/sdb1` accordingly.
+
 
 <!-- Convert to HTML using markdown -->
