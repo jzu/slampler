@@ -71,9 +71,9 @@
 
 struct RIFFfmtdata {
   char  data1 [22];
-  short numchannels;
+  short numchannels;                 // 1 or 2
   char  data2 [16];
-  int   size;
+  int   size;                        // of data to play back
 };
 
 struct wcb {                         // Wave Control Block
@@ -85,27 +85,28 @@ struct wcb {                         // Wave Control Block
 
 struct wcb wave [NBANKS][NSMPLS];
 
-int   smpl_flag [NSMPLS];
+int smpl_flag [NSMPLS];              // Which sample to start now
 
-int bank = 0;
+int bank = 0;                        // Current bank
 
+snd_pcm_uframes_t frames = 44;       // Don't ask
 
-snd_pcm_uframes_t frames = 44;       // But will be set later
 snd_pcm_t *handle_play;
 
-short *playbuf,
-      *filebuf;
+short *playbuf,                      // Mixed audio
+      *filebuf;                      // Read from file
 
 int   debug = 0;
 
 pthread_t jthread;                   // Joystick thread
 pthread_t kthread;                   // Keyboard thread
 
-struct termios raw_mode;
-struct termios cooked_mode;
+struct termios raw_mode;             // ~(ICANON | IECHO)
+struct termios cooked_mode;          // Backup of initial mode
 
-void  *joystick ();
+void  *joystick ();                  // Thread routines
 void  *keyboard ();
+
 void  set_led (char *led, int i);
 void  load_waves (int rep);
 void  debugsig (int signum);
@@ -117,8 +118,8 @@ void  debugsig (int signum);
 
 int main (int argc, char **argv) {
 
-  int s,
-      b,
+  int s,                             // Sample index
+      b,                             // Bank index
       i;
   int len,                           // Read from file
       res,                           // Result for file operations
@@ -140,8 +141,8 @@ int main (int argc, char **argv) {
 
   /* Read sample names and headers */
 
-  for (i = 0; i < NBANKS; i++)
-    load_waves (i);
+  for (b = 0; b < NBANKS; b++)
+    load_waves (b);
 
   /* Thread */
 
