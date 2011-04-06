@@ -64,9 +64,6 @@ The `datamount` process is optional. Running it requires this line in
 
     sl:23:respawn:/[PATH_TO]/datamount
 
-and this line in `/etc/fstab`:
-
-    /dev/sdb1       /    vfat    ro         0 0
 
 CAVEAT
 ------
