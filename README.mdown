@@ -59,6 +59,14 @@ create ramdisks for `/tmp` and `/var/run` directories.
     none       /tmp      ramfs   size=512k  0 0
     none       /var/run  ramfs   size=512k  0 0
 
+The `datamount` process is optional. Running it requires this line in 
+`/etc/inittab`:
+
+`sl:23:respawn:/[PATH_TO]/datamount`
+
+and this line in `/etc/fstab`:
+
+    /dev/sdb1       /    vfat    ro         0 0
 
 CAVEAT
 ------
@@ -79,9 +87,10 @@ you plug it directly in one of the Slug's USB internal ports, it will be
 detected *before* the boot USB key and the system will hang. Autofs doesn't
 help us very much here since the directory is already used by the running
 process, which has been started by inittab - even when stopping/restarting the
-process. A possible workaround would involve a cron job (thus reanimating the
-cron daemon), launched every minute, which would have to detect a `/dev/sdb`
-device, compare with `/proc/mounts`, and mount/umount `/dev/sdb1` accordingly.
+process. 
+
+This is why datamount has been written, which detects insertion or removal of
+the device and `(u)mount`s it accordingly, restarting the `slampler` process.
 
 
 <!-- Convert to HTML using markdown -->
