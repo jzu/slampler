@@ -44,7 +44,7 @@ RUNNING
 
 Once you're all set, you want to edit `/etc/inittab` to insert this line:
 
-`sl:23:respawn:/[PATH_TO]/slampler`
+    sl:23:respawn:/[PATH_TO]/slampler
 
 (obviously replacing `[PATH_TO]` with its actual path)
 which will ensure that `init(8)` restarts the program when it is stopped.
@@ -62,7 +62,7 @@ create ramdisks for `/tmp` and `/var/run` directories.
 The `datamount` process is optional. Running it requires this line in 
 `/etc/inittab`:
 
-`sl:23:respawn:/[PATH_TO]/datamount`
+    sl:23:respawn:/[PATH_TO]/datamount
 
 and this line in `/etc/fstab`:
 

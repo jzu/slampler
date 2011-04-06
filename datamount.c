@@ -5,7 +5,13 @@
  *
  * Custom automounter for the Slampler project
  * Allows to mount a memory stick on the fly
- * 
+ * Looks for "sdb1" in /proc/diskstats and /proc/mounts
+ * If present in diskstats / absent in mounts => mount /dev/sdb1 /data
+ * If absent in diskstats / present in mounts => umount /data
+ * Before (u)mounting, kills the slampler process (to be restarted by init)
+ * Sleeps 15 seconds
+ * Should be run from inittab, just like slampler
+ *
  *  gcc datamount.c -Wall -g -o datamount
  *
  *
