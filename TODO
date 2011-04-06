@@ -1,4 +1,3 @@
-- Replace these lists of elsifs in input threads by loops
 - Create yet another input thread to use an USB keyboard
 - Test different soundcards: Behringer UFO202 and others
 - Test on a DockStar

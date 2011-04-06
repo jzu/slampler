@@ -51,8 +51,8 @@ which will ensure that `init(8)` restarts the program when it is stopped.
 
 `telinit q` will re-read the inittab file.
 
-Mounting the / filesystem read-only prevents data corruption, but you have to
-create ramdisks for `/tmp` and `/var/run` directories. 
+Mounting the `/` filesystem read-only prevents data corruption, but you have to
+create ramdisks for `/tmp` and `/var/run` directories in `/etc/fstab`.
 
     /dev/sda2       /    ext3    ro         0 0
     (...)
