@@ -5,7 +5,7 @@ Version 1.0 (more or less)
 
 Foot-friendly, stage-ready sample player
 
-Copyright (C) Jean Zundel <jzu@free.fr> 2010 
+Copyright (C) Jean Zundel <jzu@free.fr> 2010-2011
 
 The **slampler** is a sample player designed for the Linksys NSLU2 running
 GNU/Linux, but it works on any ALSA-based architecture.  It is licensed under
@@ -62,7 +62,7 @@ create ramdisks for `/tmp` and `/var/run` directories in `/etc/fstab`.
 The `datamount` process is optional. Running it requires this line in 
 `/etc/inittab`:
 
-    sl:23:respawn:/[PATH_TO]/datamount
+    dt:23:respawn:/[PATH_TO]/datamount
 
 
 CAVEAT
