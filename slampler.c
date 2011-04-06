@@ -388,7 +388,11 @@ void load_waves (int rep) {
 
 void *joystick ()
 {
-  int jfd;
+
+  int joymap [8] = { SW_SMPL0, SW_SMPL1, SW_SMPL2, SW_SMPL3, 
+                     SW_SMPL4, SW_SMPL5, SW_SMPL6, SW_SMPL7 };
+  int jfd,
+      s;
   struct js_event ev,
                   oldev;
 
@@ -400,7 +404,12 @@ void *joystick ()
   while (1) {
     if (read (jfd, &ev, sizeof (ev)) > 0) {
       if ((ev.type == JS_EVENT_BUTTON) &&
-               (ev.value == 1)) {
+          (ev.value == 1)) {
+        for (s=0; s<NSMPLS; s++)
+          if (ev.number == joymap [s])
+            smpl_flag [s] ^= 1;
+        if (ev.number == SW_BANK) {
+/*
         if      (ev.number == SW_SMPL0)            // Yeuch
           smpl_flag[0] ^= 1;
         else if (ev.number == SW_SMPL1)
@@ -420,6 +429,7 @@ void *joystick ()
         else if (ev.number == SW_SMPL8)
           smpl_flag[8] ^= 1;
         else if (ev.number == SW_BANK) {
+*/
           switch (++bank) {
             case 3:
               bank = 0;
@@ -477,7 +487,9 @@ void *joystick ()
 void *keyboard ()
 {
 
+  char keymap [8] = {'a', 'z', 'e', 'r', 't', 'y', 'u', 'i'};
   char c;
+  int  s;
 
   /* We like it raw */
 
@@ -494,25 +506,10 @@ void *keyboard ()
 
   while (1) {
     if (read (0, &c, 1) == 1) {
-      if      (c == 'a')       // 'q' (and 'w' below) might suit you better
-        smpl_flag[0] ^= 1;
-      else if (c == 'z')
-        smpl_flag[1] ^= 1;
-      else if (c == 'e')
-        smpl_flag[2] ^= 1;
-      else if (c == 'r')
-        smpl_flag[3] ^= 1;
-      else if (c == 't')
-        smpl_flag[4] ^= 1;
-      else if (c == 'y')
-        smpl_flag[5] ^= 1;
-      else if (c == 'u')
-        smpl_flag[6] ^= 1;
-      else if (c == 'i')
-        smpl_flag[7] ^= 1;
-      else if (c == 'o')
-        smpl_flag[8] ^= 1;
-      else if (c == '\n') {
+      for (s=0; s<NSMPLS; s++)
+        if (c == keymap [s])
+          smpl_flag [s] ^= 1;
+      if (c == '\n') {
         switch (++bank) {
           case 3:
             bank = 0;
