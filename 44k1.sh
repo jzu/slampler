@@ -3,7 +3,7 @@
 # Normalizes any WAV file to a slampler-compatible format
 # (c) jzu@free.fr 2011
 
-if [ $# -eq 0 ] 
+if [ $# -lt 2 ] 
 then
   echo Usage: `basename $0`  SRC.wav DST.wav 1>&2
   exit 1
