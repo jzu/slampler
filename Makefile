@@ -9,3 +9,6 @@ slampler: slampler.c
 
 datamount: datamount.c
 	gcc -Wall -g -o $@ $<
+
+clean:
+	/bin/rm slampler datamount

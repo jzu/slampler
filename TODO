@@ -1,3 +1,4 @@
+- Allow a "fugitive" mode where the sample stops when releasing the switch
 - Create yet another input thread to use an USB keyboard
 - Test different soundcards: Behringer UFO202 and others
 - Test on a DockStar

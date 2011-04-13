@@ -39,6 +39,8 @@
 #include <dirent.h>
 #include <termios.h>
 
+#define FRAMES 44          /* Don't ask */
+
 #define DATADIR "/data"
 #define NBANKS 3
 #define NSMPLS 5
@@ -89,7 +91,7 @@ int smpl_flag [NSMPLS];              // Which sample to start now
 
 int bank = 0;                        // Current bank
 
-snd_pcm_uframes_t frames = 44;       // Don't ask
+snd_pcm_uframes_t frames = FRAMES;
 
 snd_pcm_t *handle_play;
 
