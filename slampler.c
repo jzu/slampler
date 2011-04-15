@@ -401,7 +401,8 @@ void *joystick ()
   memset (&oldev, 0, sizeof (struct js_event));
   memset (smpl_flag, 0, sizeof (int) * NSMPLS);
 
-  jfd = open ("/dev/input/js0", O_RDONLY);
+  while ((jfd = open ("/dev/input/js0", O_RDONLY)) <= 0)
+    sleep (30);
 
   while (1) {
     if (read (jfd, &ev, sizeof (ev)) > 0) {
@@ -411,27 +412,6 @@ void *joystick ()
           if (ev.number == joymap [s])
             smpl_flag [s] ^= 1;
         if (ev.number == SW_BANK) {
-/*
-        if      (ev.number == SW_SMPL0)            // Yeuch
-          smpl_flag[0] ^= 1;
-        else if (ev.number == SW_SMPL1)
-          smpl_flag[1] ^= 1;
-        else if (ev.number == SW_SMPL2)
-          smpl_flag[2] ^= 1;
-        else if (ev.number == SW_SMPL3)
-          smpl_flag[3] ^= 1;
-        else if (ev.number == SW_SMPL4)
-          smpl_flag[4] ^= 1;
-        else if (ev.number == SW_SMPL5)
-          smpl_flag[5] ^= 1;
-        else if (ev.number == SW_SMPL6)
-          smpl_flag[6] ^= 1;
-        else if (ev.number == SW_SMPL7)
-          smpl_flag[7] ^= 1;
-        else if (ev.number == SW_SMPL8)
-          smpl_flag[8] ^= 1;
-        else if (ev.number == SW_BANK) {
-*/
           switch (++bank) {
             case 3:
               bank = 0;
