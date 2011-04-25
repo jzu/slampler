@@ -64,6 +64,14 @@ The `datamount` process is optional. Running it requires this line in
 
     dt:23:respawn:/[PATH_TO]/datamount
 
+Activating eth0 mysteriously fails with readonly filesystems, so
+this kludge in `/etc/rc.local` temporarily switches to `rw`,
+`ifconfig`s eth0, then switches back to `ro`.
+
+    mount /dev/sda2 / -o rw,remount
+    ifconfig eth0 192.168.0.106
+    sleep 1                          # Yes, you really need it. Whatever.
+    mount /dev/sda2 / -o ro,remount
 
 CAVEAT
 ------
