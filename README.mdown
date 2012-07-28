@@ -38,11 +38,12 @@ containing NSMPLS (5 by default) samples which will be read in
 alphabetical order (case-sensitive), allowing a fixed sample/switch
 mapping.
 
-An optional `/etc/slampler.conf` will be read if it exists. Current parameters
-include the ALSA device used, and the numbers of banks and samples.
-
 RUNNING
 -------
+
+An optional `/etc/slampler.conf` will be read if it exists. Current parameters
+include the ALSA device used, and the numbers of banks and samples. You can
+edit a copy of the slampler.conf.sample file which comes with this archive.
 
 Once you're all set, you want to edit `/etc/inittab` to insert this line:
 

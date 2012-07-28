@@ -118,6 +118,7 @@ void  *keyboard ();
 void  set_led (char *led, int i);
 void  load_waves (int rep);
 void  debugsig (int signum);
+void  config ();
 
 
 /****************************************************************************
@@ -144,7 +145,7 @@ int main (int argc, char **argv) {
   nsmpls = 5;
   nbanks = 3;
 
-//  config ();
+  config ();
 
   DEBUG ("device=%s, banks=%d, samples=%d\n", device, nbanks, nsmpls);
 

@@ -1,0 +1,10 @@
+# slampler.conf sample file
+#
+# Syntax is more or less free-form, the only constraint being 
+# the location of the keyword at the beginning of the line. 
+# Errors are gracefully handled, i.e. ignored.
+# All declarations below are legal.
+
+device=plughw:0
+banks = 3
+samples 5
