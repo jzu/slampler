@@ -41,9 +41,11 @@
 
 #define FRAMES 44          /* Don't ask */
 
+#define PRMLEN 512
+#define CONFIG "/etc/slampler.conf"
+#define NP 3
+
 #define DATADIR "/data"
-#define NBANKS 3
-#define NSMPLS 5
 
 #define DEBUG if (debug) printf
 #define ERROR if (debug) fprintf
@@ -79,17 +81,21 @@ struct RIFFfmtdata {
 };
 
 struct wcb {                         // Wave Control Block
-  char   path[256];                  //  filename
+  char   path [256];                 //  filename
   int    fd;                         //  file descriptor
   int    start;                      //  switch activated
   struct RIFFfmtdata head;           //  WAV header
 };
 
-struct wcb wave [NBANKS][NSMPLS];
+struct wcb **wave;                   // [nbanks][nsmpls]
 
-int smpl_flag [NSMPLS];              // Which sample to start now
+int *smpl_flag;                      // Which sample to start now
 
-int bank = 0;                        // Current bank
+char device [256];                   // ALSA device we're using (cfg)
+int  nsmpls;                         // Number of samples per bank (cfg)
+int  nbanks;                         // Number of banks (cfg)
+
+int  bank = 0;                       // Current bank
 
 snd_pcm_uframes_t frames = FRAMES;
 
@@ -128,11 +134,25 @@ int main (int argc, char **argv) {
       rc;                            // Result for ALSA operations
   unsigned int rate = 44100;         // Sample rate
 
-//  snd_pcm_hw_params_t *params_play;
-
 
   if ((argc > 1) && (!strcmp (argv [1], "-d")))
     debug = 1;
+
+  /* Initialize configuration parameters */
+
+  strcat (device, "plughw:0");
+  nsmpls = 5;
+  nbanks = 3;
+
+//  config ();
+
+  DEBUG ("device=%s, banks=%d, samples=%d\n", device, nbanks, nsmpls);
+
+  wave = (struct wcb **) malloc (nsmpls * sizeof (struct wcb *));
+  for (i = 0; i < nsmpls; i++)
+    wave [i] = (struct wcb *) malloc (sizeof (struct wcb));
+
+  smpl_flag = (int *) malloc (nsmpls * sizeof (int));
 
   /* LED init */
 
@@ -143,7 +163,7 @@ int main (int argc, char **argv) {
 
   /* Read sample names and headers */
 
-  for (b = 0; b < NBANKS; b++)
+  for (b = 0; b < nbanks; b++)
     load_waves (b);
 
   /* Thread */
@@ -188,7 +208,7 @@ int main (int argc, char **argv) {
 
     /* Has a new sample been activated ? */
 
-    for (s = 0; s < NSMPLS; s++)
+    for (s = 0; s < nsmpls; s++)
       if (smpl_flag [s]) {
         smpl_flag [s] = 0;
         if (wave [bank][s].fd > 0) {
@@ -205,8 +225,8 @@ int main (int argc, char **argv) {
 
     memset (playbuf, 0, frames*4);                       // Stereo, 16-bit
                                               
-    for (b = 0; b < NBANKS; b++)
-      for (s = 0; s < NSMPLS; s++)
+    for (b = 0; b < nbanks; b++)
+      for (s = 0; s < nsmpls; s++)
         if (wave [b][s].fd) {
           len = frames * 2 * wave [b][s].head.numchannels;
           res = read (wave [b][s].fd, 
@@ -323,23 +343,23 @@ void load_waves (int rep) {
   char *s;
   int  mod;
 
-  memset (name, 0, sizeof (char *) * NSMPLS);
+  memset (name, 0, sizeof (char *) * nsmpls);
   s = malloc (256);
 
   sprintf (repname, "%s/%d", DATADIR, rep);
   if ((dirp = opendir (repname)) != NULL) {
     f = 0;
     while (((dp = readdir (dirp)) != NULL) && 
-           (f < NSMPLS)) {
+           (f < nsmpls)) {
       if (dp->d_name[0] != '.') {
         name [f] = malloc (256);
         strcpy (name [f], dp->d_name);
         f++;
       }
     }
-    for (f = 0; f < NSMPLS-1; f++) {             // Bubble sort
+    for (f = 0; f < nsmpls-1; f++) {             // Bubble sort
       for (g = 0, mod = 0; 
-           (g < NSMPLS-1) && (name [g+1] != NULL); 
+           (g < nsmpls-1) && (name [g+1] != NULL); 
            g++) {
         if (strcmp (name [g], name [g+1]) > 0 ) {
           mod = 1;
@@ -349,10 +369,10 @@ void load_waves (int rep) {
         }
       }
       if (! mod)
-        f = NSMPLS;                              // Completed, exit
+        f = nsmpls;                              // Completed, exit
     }
     for (f = 0; 
-         (f < NSMPLS) && (name [f] != NULL); 
+         (f < nsmpls) && (name [f] != NULL); 
          f++) {
       sprintf (wave [rep][f].path, "%s/%d/%s", 
                DATADIR, 
@@ -367,7 +387,7 @@ void load_waves (int rep) {
     }
     closedir (dirp);
 
-    for (f = 0; (f < NSMPLS) && (name [f] != NULL); f++)
+    for (f = 0; (f < nsmpls) && (name [f] != NULL); f++)
       free (name [f]);
 
     return;
@@ -399,7 +419,7 @@ void *joystick ()
                   oldev;
 
   memset (&oldev, 0, sizeof (struct js_event));
-  memset (smpl_flag, 0, sizeof (int) * NSMPLS);
+  memset (smpl_flag, 0, sizeof (int) * nsmpls);
 
   while ((jfd = open ("/dev/input/js0", O_RDONLY)) <= 0)
     sleep (30);
@@ -408,7 +428,7 @@ void *joystick ()
     if (read (jfd, &ev, sizeof (ev)) > 0) {
       if ((ev.type == JS_EVENT_BUTTON) &&
           (ev.value == 1)) {
-        for (s=0; s<NSMPLS; s++)
+        for (s=0; s<nsmpls; s++)
           if (ev.number == joymap [s])
             smpl_flag [s] ^= 1;
         if (ev.number == SW_BANK) {
@@ -484,11 +504,11 @@ void *keyboard ()
   tcsetattr (0, TCSANOW, &raw_mode);
 
   c = '\0';
-  memset (smpl_flag, 0, sizeof (int) * NSMPLS);
+  memset (smpl_flag, 0, sizeof (int) * nsmpls);
 
   while (1) {
     if (read (0, &c, 1) == 1) {
-      for (s=0; s<NSMPLS; s++)
+      for (s=0; s<nsmpls; s++)
         if (c == keymap [s])
           smpl_flag [s] ^= 1;
       if (c == '\n') {
@@ -541,5 +561,59 @@ void debugsig (int signum) {
   set_led (LED_STATUS,1);
 
   exit(0);
+}
+
+/****************************************************************************
+ * config()
+ * 
+ * Unsafe config.ini-style parsing routine. Fits the bill. Kids, do not try 
+ * this at home. Use https://github.com/ndevilla/iniparser instead.
+ ****************************************************************************/
+
+void config () {
+
+  FILE *config;
+
+  const char *param [] = {"device", "banks", "samples"}; /* NP */
+
+  char line [PRMLEN];
+  char value [PRMLEN];
+
+  int p;
+  int i;
+  int j;
+
+  if ((config = fopen (CONFIG, "r")) != NULL) {
+    while (fgets (line, PRMLEN, config) != NULL) {
+      for (p = 0; p < NP; p++) {
+        if (strstr (line, param [p]) == line) {
+          i = strlen (param [p]);
+          while ((line [i] != 0) &&
+                 ((line [i] == ' ') ||
+                  (line [i] == '\t') ||
+                  (line [i] == '='))) 
+            i++;
+          j = 0;
+          while ((line [i] != 0) &&
+                 (line [i] != 10) &&
+                 (line [i] != 13)) {
+            value [j]  = line [i];
+            i++;
+            j++;
+          }
+          value [j] = '\0';
+          if (strcmp (param [p], "device") == 0)
+            strcpy (device, value);
+          else 
+          if (strcmp (param [p], "banks") == 0)
+            nbanks = atoi (value);
+          else 
+          if (strcmp (param [p], "samples") == 0)
+            nsmpls = atoi (value);
+        }
+      } 
+    }
+  }
+  fclose (config);
 }
 

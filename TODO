@@ -1,4 +1,4 @@
-- Optional config file (/etc/slampler.conf)
+- Split the sources
 - Allow to stop a running sample when switching banks
 - Allow a "fugitive" mode where the sample stops when releasing the switch
 - Gracefully handle errors while opening /dev/js0
